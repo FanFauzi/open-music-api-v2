@@ -24,13 +24,25 @@ const AuthenticationsService = require('./services/postgres/AuthenticationsServi
 const AuthenticationsValidator = require('./validator/authentications');
 const TokenManager = require('./tokenize/TokenManager');
 
+// playlists
+const playlists = require('./api/playlists');
+const PlaylistsService = require('./services/postgres/PlaylistsService');
+const PlaylistValidator = require('./validator/playlists');
+
+// collaborations
+const collaborations = require('./api/collaborations');
+const CollaborationsService = require('./services/postgres/CollaborationsService');
+const CollaborationsValidator = require('./validator/collaborations');
+
 // exeptions
 const ClientError = require('./exceptions/ClientError');
 
 const init = async () => {
+  const collaborationsService = new CollaborationsService();
+  const playlistsService = new PlaylistsService(collaborationsService);
+  const usersService = new UsersService();
   const albumsService = new AlbumsService();
   const songsService = new SongsService();
-  const usersService = new UsersService();
   const authenticationsService = new AuthenticationsService();
 
   const server = Hapi.server({
@@ -98,13 +110,28 @@ const init = async () => {
         validator: AuthenticationsValidator,
       },
     },
+    {
+      plugin: playlists,
+      options: {
+        service: playlistsService,
+        validator: PlaylistValidator,
+      },
+    },
+    {
+      plugin: collaborations,
+      options: {
+        collaborationsService,
+        playlistsService,
+        usersService,
+        validator: CollaborationsValidator,
+      },
+    },
   ]);
 
   server.ext('onPreResponse', (request, h) => {
     const { response } = request;
 
     if (response instanceof Error) {
-      console.log(response);
       if (response instanceof ClientError) {
         const newResponse = h.response({
           status: 'fail',
